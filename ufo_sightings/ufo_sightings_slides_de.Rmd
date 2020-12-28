@@ -1,0 +1,68 @@
+---
+title: "Sichtungen von UFOs"
+subtitle: "Eine Silvester-Präsentation"
+author: "Lukas Warode"
+date: "Letztes Update: `r Sys.Date()` <br /> Datum: 2020-12-31"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+background-image: url(https://lwarode.github.io/images/logo_lw.png)
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+
+knitr::opts_chunk$set(echo = FALSE,
+                  message = FALSE,
+                  warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r data management}
+ufo_raw <- read_csv("https://raw.githubusercontent.com/planetsig/ufo-reports/master/csv-data/ufo-complete-geocoded-time-standardized.csv")
+```
+
+---
+
+class: center, middle
+background-image: url("https://upload.wikimedia.org/wikipedia/commons/d/df/PurportedUFO2.jpg")
+background-position: top
+
+# UFO-Sichtungen
+
+### *(Reißerischen Untertitel einfügen)*
+
+---
+
+# Wie kommt man dazu?
+
+- Langeweile
+
+--
+
+- Datenaffinität (für FB8-Standards)
+
+--
+
+- Suche nach möglichst ausgefallenen und lustigen Datensätzen
+
+--
+
+- *n-tv um 01:52 Vibes*
+
+--
+
+---
+
+# Worum geht es eigentlich genau?
+
+
