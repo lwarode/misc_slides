@@ -2,7 +2,7 @@
 title: "Sichtungen von UFOs"
 subtitle: "Eine Silvester-Präsentation"
 author: "Lukas Warode"
-date: "Letztes Update: `r Sys.Date()` <br /> Datum: 2020-12-31"
+date: "Datum: 2020-12-31 <br /> Letztes Update: `r Sys.Date()`"
 output:
   xaringan::moon_reader:
     lib_dir: libs
@@ -19,16 +19,41 @@ options(htmltools.dir.version = FALSE)
 
 knitr::opts_chunk$set(echo = FALSE,
                   message = FALSE,
-                  warning = FALSE)
+                  warning = FALSE,
+                  dpi = 300,
+                  fig.width = 10,
+                  fig.height = 7)
 ```
 
-```{r}
+```{r packages}
 library(tidyverse)
+library(lubridate)
 ```
 
 
 ```{r data management}
-ufo_raw <- read_csv("https://raw.githubusercontent.com/planetsig/ufo-reports/master/csv-data/ufo-complete-geocoded-time-standardized.csv")
+ufo_raw <- read_csv("data/nuforc_reports.csv")
+
+ufo <- ufo_raw %>% 
+  mutate(year_date = year(date_time),
+         duration_number = extract_numeric(duration),
+         duration_type = case_when(
+           str_detect(duration, "sec|SEC|Sec") ~ "seconds",
+           str_detect(duration, "min|MIN|Min") ~ "minutes",
+           str_detect(duration, "hours|Hours|hrs") ~ "hours",
+           str_detect(duration, "day|Day") ~ "days",
+           str_detect(duration, "week|Week") ~ "weeks"
+         ),
+         duration_new = case_when(
+           duration_type == "seconds" ~ duration(duration_number, "seconds")))
+# 
+#            duration_type == "minutes" ~ minutes(duration_number %>% as.integer()),
+#            duration_type == "hours" ~ hours(duration_number %>% as.integer()),
+#            duration_type == "days" ~ days(duration_number %>% as.integer()),
+#            duration_type == "weeks" ~ weeks(duration_number %>% as.integer())
+#          ),
+#          duration_new = if_else(duration_new < 0, duration_new * -1, duration_new)
+#   )
 ```
 
 ---
@@ -64,5 +89,126 @@ background-position: top
 ---
 
 # Worum geht es eigentlich genau?
+
+- **U**nbekannte **F**lug**o**bjekte
+
+--
+
+  - Abgekürzt: **UFO**
+  
+--
+
+  - Plural: **UFOs**
+
+  
+--
+
+- Ugs.: "Fliegende Untertasse(n)"
+
+--
+
+- Diskus- oder untertassenförmige (unbekannte) Flugobjekte
+
+--
+
+- Verbreitete hypothetische Annahme: Es handelt sich um Raumschiffe, die von Außerirdischen, sog. *Aliens* gesteuert und/oder betrieben werden
+  
+---
+
+# Wie nähern wir uns dem Thema an?
+
+- **Option 1**: Eruieren individueller UFO-Sichtungen
+
+--
+
+- **Option 2**: Alternative Herangehensweise: Sturm auf Area 51 (*Storm Area 51*)
+
+--
+
+.pull-left[
+**Option 1**
+
+- Geringer Aufwand
+
+- Geringe Kosten
+
+- Datengrundlage verfügbar
+]
+
+--
+
+.pull-right[
+**Option 2**
+
+- Hoher Aufwand
+
+- Hohe bis sehr hohe Kosten
+
+- Vorgehen unklar, fatale Resultate möglich
+]
+
+---
+
+# Datengrundlage
+
+- [The National UFO Reporting Center](http://www.nuforc.org/)<sup>1</sup>
+  - US-Organisation, die Daten zu individuellen UFO-Sichtungen sammelt
+  
+--
+
+- Die meinen es ernst!
+
+.center[![](http://www.nuforc.org/index_files/image011.jpg)]
+
+.footnotes[
+[1] www.nuforc.org
+]
+
+---
+
+# Histogramm der Vorfälle
+
+```{r}
+theme_set(theme_linedraw())
+
+# ufo %>% 
+#   ggplot(aes(year_date)) + 
+#   geom_histogram()
+
+ufo %>% 
+  ggplot(aes(year_date)) + 
+  geom_bar() + 
+  geom_text(stat = "count", aes(label = ..count..), angle = 90, hjust = -0.125) + 
+  labs(x = "Jahr",
+       y = "Anzahl der Vorfälle") + 
+  scale_y_continuous(limits = c(0, 9000))
+```
+
+---
+
+# Formen der gesichteten UFOs
+
+```{r}
+ufo %>% 
+  group_by(shape) %>% 
+  summarise(n = n()) %>%
+  mutate(freq = round(n / sum(n), 2)) %>% 
+  arrange(desc(n)) %>% 
+  # rename(Form = shape) %>% 
+  DT::datatable()
+```
+
+---
+
+# Dauer der UFO-Sichtungen<sup>1</sup>
+
+```{r}
+# ufo %>% 
+#   ggplot(aes(duration_new)) + 
+#   geom_density()
+```
+
+--- 
+
 
 
