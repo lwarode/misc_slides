@@ -28,24 +28,39 @@ knitr::opts_chunk$set(echo = FALSE,
 ```{r packages}
 library(tidyverse)
 library(lubridate)
+library(scales)
 ```
 
 
 ```{r data management}
-ufo_raw <- read_csv("data/nuforc_reports.csv")
+# source: https://data.world/timothyrenner/ufo-sightings
+ufo_raw <- read_csv(here::here("ufo_sightings/data/nuforc_reports.csv"))
 
 ufo <- ufo_raw %>% 
-  mutate(year_date = year(date_time),
+  mutate(
+         year_date = year(date_time),
+         decade_date = year_date - year_date %% 10,
          duration_number = extract_numeric(duration),
+         # replace negative values with NA
+         duration_number = replace(duration_number, duration_number < 0, NA),
          duration_type = case_when(
            str_detect(duration, "sec|SEC|Sec") ~ "seconds",
            str_detect(duration, "min|MIN|Min") ~ "minutes",
-           str_detect(duration, "hours|Hours|hrs") ~ "hours",
+           str_detect(duration, "hours|Hours|hrs|hr|h") ~ "hours",
            str_detect(duration, "day|Day") ~ "days",
            str_detect(duration, "week|Week") ~ "weeks"
          ),
-         duration_new = case_when(
-           duration_type == "seconds" ~ duration(duration_number, "seconds")))
+         # quasi-rational cut-offs for final duration variable (unit: minutes)
+         duration_minutes = case_when(
+           duration_type == "seconds" & duration_number <= 120 ~ duration_number / 60,
+           duration_type == "minutes" & duration_number <= 100 ~ duration_number,
+           duration_type == "hours" & duration_number <= 10 ~ duration_number * 60
+         )
+         
+  )
+         
+         # duration_new = case_when(
+         #   duration_type == "seconds" ~ duration(duration_number, "seconds")))
 # 
 #            duration_type == "minutes" ~ minutes(duration_number %>% as.integer()),
 #            duration_type == "hours" ~ hours(duration_number %>% as.integer()),
@@ -170,6 +185,8 @@ background-position: top
 
 ```{r}
 theme_set(theme_linedraw())
+theme_update(strip.background = element_blank(),
+             strip.text = element_text(color = "black"))
 
 # ufo %>% 
 #   ggplot(aes(year_date)) + 
@@ -188,8 +205,25 @@ ufo %>%
 
 # Formen der gesichteten UFOs
 
+.pull-left[
+![](https://upload.wikimedia.org/wikipedia/commons/7/75/TriangleBelgium1990.jpg)
+![](https://upload.wikimedia.org/wikipedia/commons/d/d8/Flying_cigar.png)
+]
+
+--
+
+.pull-right[
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Lenticulariswolke.jpg/800px-Lenticulariswolke.jpg)
+![](https://upload.wikimedia.org/wikipedia/commons/5/56/Ghostrocket_7-09-1946.jpg)
+]
+
+---
+
+# Formen der gesichteten UFOs
+
 ```{r}
 ufo %>% 
+  mutate(shape = replace_na(shape, "no information")) %>% 
   group_by(shape) %>% 
   summarise(n = n()) %>%
   mutate(freq = round(n / sum(n), 2)) %>% 
@@ -202,13 +236,202 @@ ufo %>%
 
 # Dauer der UFO-Sichtungen<sup>1</sup>
 
-```{r}
-# ufo %>% 
-#   ggplot(aes(duration_new)) + 
-#   geom_density()
+```{r, fig.height = 5}
+ufo %>%
+  ggplot(aes(duration_minutes)) +
+  geom_histogram() + 
+  labs(x = "Dauer in Minuten", 
+       y = "Anzahl der Sichtungen") -> pl_1
+
+ufo %>%
+  ggplot(aes(duration_minutes)) +
+  geom_density() +
+  labs(x = "Dauer in Minuten", 
+       y = "Dichte der Sichtungen") -> pl_2
+
+egg::ggarrange(pl_1, pl_2, ncol = 2)
 ```
 
---- 
+.footnote[
+[1] Ungewöhnlich lange Sichtungen (u.a. Tage und Wochen) wurden aus der Analyse (aus Validitätsgründen) ausgeschlossen
+]
 
+---
 
+# Jetzt wird es ernst…
 
+.center[![](https://i.imgflip.com/4s1guu.jpg)]
+
+---
+
+# Statistischer Zusammenhang
+
+```{r}
+# 12 most popular shape categories for facetting
+ufo_top_shapes <- ufo %>%
+  filter(! is.na(shape)) %>% 
+  group_by(shape) %>% 
+  summarise(n = n()) %>%
+  top_n(12)
+
+ufo_top_shapes %>% 
+  left_join(ufo, by = "shape") %>% 
+  ggplot(aes(x = date_time, y = duration_minutes)) + 
+  geom_point(alpha = 0.25) + 
+  geom_smooth(method = "lm") + 
+  ggpubr::stat_cor(p.accuracy = 0.01) +
+  facet_wrap(~ shape, ncol = 4) +
+  labs(y = "Dauer in Minuten", x = "Datum",
+       title = "Stat. Zusammenhang zwischen Datum und Länge der Sichtung, gruppiert nach Form der Sichtung")
+```
+
+---
+
+# Geographische Komponenten: US-Bundesstaaten
+
+```{r, fig.height=6}
+ufo %>% 
+  group_by(state) %>% 
+  add_count() %>% 
+  filter(! is.na(state)) %>% 
+  ggplot() + 
+  geom_bar(aes(x = fct_reorder(state, n))) + 
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "", y = "Anzahl der Sichtungen")
+```
+
+---
+
+# Geographische Komponenten: US-Bundesstaaten nach Jahrzehnt
+
+```{r, fig.height=6}
+ufo %>% 
+  group_by(state) %>% 
+  add_count() %>% 
+  filter(! is.na(state)) %>% 
+  ggplot() + 
+  geom_bar(aes(x = fct_reorder(state, n), fill = factor(decade_date)), position = "fill") + 
+  scale_y_continuous(label = percent_format(1)) +
+  scale_fill_ordinal(na.value = "grey", direction = -1, "Jahrzehnt") + 
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "", y = "Relativer Anteil der Sichtungen")
+```
+
+---
+
+# Geographische Komponenten: Sichtungen auf der US-Karte
+
+```{r, fig.height=6}
+us_map_sf <- urbnmapr::get_urbn_map("states", sf = TRUE) %>% 
+  filter(! state_name %in% c("Hawaii", "Alaska"))
+
+ufo_map_sf <- ufo %>% 
+  filter(! is.na(city_longitude), ! is.na(city_latitude)) %>% 
+  sf::st_as_sf(coords = c("city_longitude", "city_latitude")) %>% 
+  sf::st_set_crs(4326) %>% 
+  sf::st_transform(4326) 
+
+ggplot() +
+  geom_sf(data = us_map_sf) +
+  geom_sf(data = subset(ufo_map_sf, ! is.na(state) & ! state %in% c("HI", "AK")), alpha = 0.05, size = 0.05) + 
+  coord_sf(x = c(-130, -65),
+           y = c(25, 55))
+```
+
+---
+
+# Geographische Komponenten: Sichtungen auf der US-Karte nach Kategorie
+
+```{r, fig.height=6}
+ufo_map_sf <- ufo %>% 
+  filter(! is.na(city_longitude), ! is.na(city_latitude)) %>% 
+  sf::st_as_sf(coords = c("city_longitude", "city_latitude")) %>% 
+  sf::st_set_crs(4326) %>% 
+  sf::st_transform(4326) %>% 
+  right_join(ufo_top_shapes, by = "shape") %>% 
+  mutate(shape = factor(shape) %>% fct_reorder(-n)) %>% 
+  select(-n)
+
+ggplot() +
+  geom_sf(data = us_map_sf) +
+  geom_sf(data = subset(ufo_map_sf, ! is.na(state) & ! state %in% c("HI", "AK")), alpha = 0.05, size = 0.025) + 
+  coord_sf(x = c(-130, -65),
+           y = c(25, 55)) + 
+  facet_wrap(~ shape)
+```
+
+---
+
+# Textlicher Inhalt der gemeldeten Sichtung
+
+```{r}
+library(tidytext)
+library(stopwords)
+
+# 1 word = 1 observation
+ufo_message <- ufo %>% 
+  rowid_to_column("ID") %>% 
+  unnest_tokens(word, text)
+
+ufo_message %>% 
+  anti_join(stop_words) %>% 
+  count(word, sort = TRUE) %>% 
+  top_n(15) %>% 
+  ggplot() + 
+  geom_col(aes(x = fct_reorder(word, n), y = n)) + 
+  coord_flip() +
+  labs(x = "Wort", title = "Häufigste Wörter in Meldungen von UFO-Sichtungen")
+```
+
+---
+
+# Textlicher Inhalt der gemeldeten Sichtung
+
+```{r}
+ufo_message_facetted <- ufo_top_shapes %>% 
+  left_join(ufo_message, by = "shape") %>% 
+  select(- n) %>% 
+  anti_join(stop_words, by = "word") 
+
+ufo_message_facetted %>% 
+  group_by(shape, word) %>% 
+  summarise(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ungroup %>% 
+  mutate(word = reorder_within(word, n, shape)) %>% 
+  ggplot() + 
+  geom_col(aes(x = word, y = n)) + 
+  scale_x_reordered() +
+  coord_flip() +
+  facet_wrap(~ shape, scales = "free_y") +
+  labs(x = "Wort", 
+       title = "Häufigste Wörter in Meldungen von UFO-Sichtungen",
+       subtitle = "Gruppiert nach Form")
+```
+
+---
+
+# Textlicher Inhalt der gemeldeten Sichtung
+
+```{r}
+ufo_message_facetted_2 <- ufo_message %>% 
+  anti_join(stop_words, by = "word") 
+
+ufo_message_facetted_2 %>% 
+  filter(! is.na(decade_date)) %>% 
+  group_by(decade_date, word) %>% 
+  summarise(n = n()) %>% 
+  arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  ungroup %>% 
+  mutate(word = reorder_within(word, n, decade_date)) %>% 
+  ggplot() + 
+  geom_col(aes(x = word, y = n)) + 
+  scale_x_reordered() +
+  coord_flip() +
+  facet_wrap(~ decade_date, scales = "free_y") +
+  labs(x = "Wort", 
+       title = "Häufigste Wörter in Meldungen von UFO-Sichtungen",
+       subtitle = "Gruppiert nach Jahrzehnt")
+```
